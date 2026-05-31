@@ -1,0 +1,82 @@
+#ifndef __CUS_ILI9341_FSMC_H__
+#define __CUS_ILI9341_FSMC_H__
+
+
+#include "stm32f1xx_hal.h"
+
+
+/* ***************** FSMC_Pin_Conf ***************** */
+  /* 以下是 LCD 的 CS/WR/RS/RD 引脚所对应的 FSMC接口引脚配置(FSMC_NEx/FSMC_NWE/FSMC_Ax/FSMC_NOE). */
+  /* 请务必仔细参考所用芯片原理图以及所用LCD原理图. 确保以下引脚映射到正确位置. */
+  #define LCD_CS_PORT                      (GPIOG)
+  #define LCD_CS_PIN                       (GPIO_PIN_12)
+
+  #define LCD_WR_PORT                      (GPIOD)
+  #define LCD_WR_PIN                       (GPIO_PIN_5)
+
+  #define LCD_RS_PORT                      (GPIOG)
+  #define LCD_RS_PIN                       (GPIO_PIN_0)
+
+  #define LCD_RD_PORT                      (GPIOD)
+  #define LCD_RD_PIN                       (GPIO_PIN_4)
+
+
+  /* 以下是基于STM32F103ZET6的FSMC数据总线接口引脚配置. */
+  /* 请务必仔细核实每一位所对应引脚是否与所使用芯片相同. */
+  #define LCD_D0_PORT                      (GPIOD)
+  #define LCD_D0_PIN                       (GPIO_PIN_14)
+  #define LCD_D1_PORT                      (GPIOD)
+  #define LCD_D1_PIN                       (GPIO_PIN_15)
+  #define LCD_D2_PORT                      (GPIOD)
+  #define LCD_D2_PIN                       (GPIO_PIN_0)
+  #define LCD_D3_PORT                      (GPIOD)
+  #define LCD_D3_PIN                       (GPIO_PIN_1)
+  #define LCD_D4_PORT                      (GPIOE)
+  #define LCD_D4_PIN                       (GPIO_PIN_7)
+  #define LCD_D5_PORT                      (GPIOE)
+  #define LCD_D5_PIN                       (GPIO_PIN_8)
+  #define LCD_D6_PORT                      (GPIOE)
+  #define LCD_D6_PIN                       (GPIO_PIN_9)
+  #define LCD_D7_PORT                      (GPIOE)
+  #define LCD_D7_PIN                       (GPIO_PIN_10)
+  #define LCD_D8_PORT                      (GPIOE)
+  #define LCD_D8_PIN                       (GPIO_PIN_11)
+  #define LCD_D9_PORT                      (GPIOE)
+  #define LCD_D9_PIN                       (GPIO_PIN_12)
+  #define LCD_D10_PORT                     (GPIOE)
+  #define LCD_D10_PIN                      (GPIO_PIN_13)
+  #define LCD_D11_PORT                     (GPIOE)
+  #define LCD_D11_PIN                      (GPIO_PIN_14)
+  #define LCD_D12_PORT                     (GPIOE)
+  #define LCD_D12_PIN                      (GPIO_PIN_15)
+  #define LCD_D13_PORT                     (GPIOD)
+  #define LCD_D13_PIN                      (GPIO_PIN_8)
+  #define LCD_D14_PORT                     (GPIOD)
+  #define LCD_D14_PIN                      (GPIO_PIN_9)
+  #define LCD_D15_PORT                     (GPIOD)
+  #define LCD_D15_PIN                      (GPIO_PIN_10)
+/* ***************** FSMC_Pin_Conf ***************** */
+
+
+/* ***************** FSMC_Param_Conf ***************** */
+  #define FSMC_READ_ADDR_SETUP_TIME        (5)
+  #define FSMC_READ_ADDR_HOLD_TIME         (2)
+  #define FSMC_READ_DATA_SETUP_TIME        (2)
+
+  #define FSMC_WRITE_ADDR_SETUP_TIME       ()
+  #define FSMC_WRITE_ADDR_HOLD_TIME        ()
+  #define FSMC_WRITE_DATA_SETUP_TIME       ()
+
+  #define FSMC_ACCESS_MODE                 (FSMC_ACCESS_MODE_A)
+  #define FSMC_BUS_AROUND_DURATION         (0)
+  #define FSMC_NSBANK                      (4)
+
+/* ***************** FSMC_Param_Conf ***************** */ 
+
+
+/* ******************************** */
+void Cus_fsmc_init( void );
+/* ******************************** */
+
+#endif /* __CUS_ILI9341_FSMC_H__ */
+
