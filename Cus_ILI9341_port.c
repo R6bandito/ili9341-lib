@@ -36,3 +36,10 @@ __weak void lcd_driver_init( void )
 {
   /* NULL */
 }
+
+
+__weak void lcd_write_buffer( const uint16_t *buffer, uint32_t len )
+{
+  (void)buffer;
+  (void)len;
+}

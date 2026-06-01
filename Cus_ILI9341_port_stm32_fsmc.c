@@ -1,9 +1,10 @@
 #include "Cus_ILI9341_port_stm32_fsmc.h"
+#include "Cus_ILI9341_port.h"
 
 
 /* ******************************************* */
 void Cus_fsmc_init( void );
-static fsmc_gpio_init( void );
+static void fsmc_gpio_init( void );
 /* ******************************************* */
 
 
@@ -43,7 +44,7 @@ static const lcd_pin_t data_pins[] = {
 /* ******************************************* */
 
 
-static fsmc_gpio_init( void )
+static void fsmc_gpio_init( void )
 {
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
@@ -79,21 +80,22 @@ void Cus_fsmc_init( void )
   /* 配置GPIO. */
   fsmc_gpio_init();
 
-  FSMC_NORSRAM_InitTypeDef fsmc_init;
-  fsmc_init.AsynchronousWait    =   FSMC_ASYNCHRONOUS_WAIT_DISABLE;
-  fsmc_init.BurstAccessMode     =   FSMC_BURST_ACCESS_MODE_DISABLE;
-  fsmc_init.DataAddressMux      =   FSMC_DATA_ADDRESS_MUX_DISABLE;
-  fsmc_init.ExtendedMode        =   FSMC_EXTENDED_MODE_ENABLE;
-  fsmc_init.MemoryDataWidth     =   FSMC_NORSRAM_MEM_BUS_WIDTH_16;
-  fsmc_init.MemoryType          =   FSMC_MEMORY_TYPE_SRAM;
-  fsmc_init.NSBank              =   FSMC_NSBANK;
-  fsmc_init.PageSize            =   FSMC_PAGE_SIZE_NONE;
-  fsmc_init.WaitSignal          =   FSMC_WAIT_SIGNAL_DISABLE;
-  fsmc_init.WaitSignalActive    =   FSMC_WAIT_TIMING_BEFORE_WS;
-  fsmc_init.WaitSignalPolarity  = FSMC_WAIT_SIGNAL_POLARITY_LOW;
-  fsmc_init.WrapMode            = FSMC_WRAP_MODE_DISABLE;
-  fsmc_init.WriteBurst          = FSMC_WRITE_BURST_DISABLE;
-  fsmc_init.WriteOperation      = FSMC_WRITE_OPERATION_ENABLE;
+  SRAM_HandleTypeDef hfsmc;
+  hfsmc.Instance                 = FSMC_NORSRAM_DEVICE;
+  hfsmc.Init.AsynchronousWait    =   FSMC_ASYNCHRONOUS_WAIT_DISABLE;
+  hfsmc.Init.BurstAccessMode     =   FSMC_BURST_ACCESS_MODE_DISABLE;
+  hfsmc.Init.DataAddressMux      =   FSMC_DATA_ADDRESS_MUX_DISABLE;
+  hfsmc.Init.ExtendedMode        =   FSMC_EXTENDED_MODE_ENABLE;
+  hfsmc.Init.MemoryDataWidth     =   FSMC_NORSRAM_MEM_BUS_WIDTH_16;
+  hfsmc.Init.MemoryType          =   FSMC_MEMORY_TYPE_SRAM;
+  hfsmc.Init.NSBank              =   FSMC_NSBANK;
+  hfsmc.Init.PageSize            =   FSMC_PAGE_SIZE_NONE;
+  hfsmc.Init.WaitSignal          =   FSMC_WAIT_SIGNAL_DISABLE;
+  hfsmc.Init.WaitSignalActive    =   FSMC_WAIT_TIMING_BEFORE_WS;
+  hfsmc.Init.WaitSignalPolarity  = FSMC_WAIT_SIGNAL_POLARITY_LOW;
+  hfsmc.Init.WrapMode            = FSMC_WRAP_MODE_DISABLE;
+  hfsmc.Init.WriteBurst          = FSMC_WRITE_BURST_DISABLE;
+  hfsmc.Init.WriteOperation      = FSMC_WRITE_OPERATION_ENABLE;
 
   /* 填充FSMC读时序参数. */
   FSMC_NORSRAM_TimingTypeDef fsmc_readtiming;
@@ -105,16 +107,73 @@ void Cus_fsmc_init( void )
 
   /* 填充FSMC写时序. */
   FSMC_NORSRAM_TimingTypeDef fsmc_writetiming;
-  fsmc_writetiming.AccessMode = ;
-  fsmc_writetiming.AddressHoldTime = ;
-  fsmc_writetiming.AddressSetupTime = ;
-  fsmc_writetiming.BusTurnAroundDuration = ;
-  fsmc_writetiming.DataSetupTime = ;
+  fsmc_writetiming.AccessMode               = FSMC_ACCESS_MODE_A;
+  fsmc_writetiming.AddressHoldTime          = FSMC_WRITE_ADDR_HOLD_TIME;
+  fsmc_writetiming.AddressSetupTime         = FSMC_WRITE_ADDR_SETUP_TIME;
+  fsmc_writetiming.BusTurnAroundDuration    = FSMC_BUS_AROUND_DURATION;
+  fsmc_writetiming.DataSetupTime            = FSMC_WRITE_DATA_SETUP_TIME;
 
+  HAL_SRAM_Init(&hfsmc, &fsmc_readtiming, &fsmc_writetiming);
 }
 
 
+/* ************** 移植原语实现 ************** */
+void lcd_driver_init( void )
+{
+  Cus_fsmc_init();
+}
 
+
+void lcd_write_cmd( uint8_t cmd )
+{
+  LCD_CMD_ADDR = cmd;
+}
+
+
+void lcd_write_data( uint8_t data )
+{
+  LCD_DAT_ADDR = data;
+}
+
+
+void lcd_write_data16( uint16_t data )
+{
+  LCD_DAT_ADDR = data;
+}
+
+
+uint8_t lcd_read_data( void )
+{
+  uint8_t data;
+
+  __nop();
+  data = (uint8_t)LCD_DAT_ADDR;
+
+  return data;
+}
+
+
+uint16_t lcd_read_data16( void )
+{
+  uint16_t data;
+
+  __nop();
+  data = LCD_DAT_ADDR;
+
+  return data;
+}
+
+
+void lcd_write_buffer( const uint16_t *buffer, uint32_t len )
+{
+  if ( !buffer || len == 0 )  return;
+
+  for( uint32_t i = 0; i < len; i++ )
+  {
+    LCD_DAT_ADDR = buffer[i];
+  }
+}
+/* ************** 移植原语实现 ************** */
 
 
 

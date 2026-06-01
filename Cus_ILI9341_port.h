@@ -22,6 +22,10 @@ __weak uint8_t lcd_read_data( void );
 
 
 __weak uint16_t lcd_read_data16( void );
+
+
+/* 显存批量写入(选择实现). */
+__weak void lcd_write_buffer( const uint16_t *buffer, uint32_t len );
 /* ****************** ILI9341_PORT ****************** */
 
 
