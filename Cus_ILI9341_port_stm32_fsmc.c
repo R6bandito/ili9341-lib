@@ -16,6 +16,10 @@ typedef struct
 
 } lcd_pin_t;
 
+static const lcd_pin_t bl_pin[] = {
+  {.gpioPort = LCD_BL_PORT, .gpioPin = LCD_BL_PIN}
+};
+
 static const lcd_pin_t ctrl_pins[] = {
   {.gpioPort = LCD_CS_PORT, .gpioPin = LCD_CS_PIN},
   {.gpioPort = LCD_WR_PORT, .gpioPin = LCD_WR_PIN},
@@ -46,6 +50,7 @@ static const lcd_pin_t data_pins[] = {
 
 static void fsmc_gpio_init( void )
 {
+  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
@@ -68,6 +73,11 @@ static void fsmc_gpio_init( void )
     GpioInitStructure.Pin = data_pins[i].gpioPin;
     HAL_GPIO_Init(data_pins[i].gpioPort, &GpioInitStructure);
   }
+
+  /* 背光引脚单独初始化. */
+  GpioInitStructure.Mode = GPIO_MODE_OUTPUT_PP;
+  GpioInitStructure.Pin = bl_pin[0].gpioPin;
+  HAL_GPIO_Init(bl_pin[0].gpioPort, &GpioInitStructure);
 }
 
 
@@ -81,7 +91,8 @@ void Cus_fsmc_init( void )
   fsmc_gpio_init();
 
   SRAM_HandleTypeDef hfsmc;
-  hfsmc.Instance                 = FSMC_NORSRAM_DEVICE;
+  hfsmc.Instance                 =   FSMC_NORSRAM_DEVICE;
+  hfsmc.Extended                 =   FSMC_NORSRAM_EXTENDED_DEVICE;
   hfsmc.Init.AsynchronousWait    =   FSMC_ASYNCHRONOUS_WAIT_DISABLE;
   hfsmc.Init.BurstAccessMode     =   FSMC_BURST_ACCESS_MODE_DISABLE;
   hfsmc.Init.DataAddressMux      =   FSMC_DATA_ADDRESS_MUX_DISABLE;
@@ -92,10 +103,10 @@ void Cus_fsmc_init( void )
   hfsmc.Init.PageSize            =   FSMC_PAGE_SIZE_NONE;
   hfsmc.Init.WaitSignal          =   FSMC_WAIT_SIGNAL_DISABLE;
   hfsmc.Init.WaitSignalActive    =   FSMC_WAIT_TIMING_BEFORE_WS;
-  hfsmc.Init.WaitSignalPolarity  = FSMC_WAIT_SIGNAL_POLARITY_LOW;
-  hfsmc.Init.WrapMode            = FSMC_WRAP_MODE_DISABLE;
-  hfsmc.Init.WriteBurst          = FSMC_WRITE_BURST_DISABLE;
-  hfsmc.Init.WriteOperation      = FSMC_WRITE_OPERATION_ENABLE;
+  hfsmc.Init.WaitSignalPolarity  =   FSMC_WAIT_SIGNAL_POLARITY_LOW;
+  hfsmc.Init.WrapMode            =   FSMC_WRAP_MODE_DISABLE;
+  hfsmc.Init.WriteBurst          =   FSMC_WRITE_BURST_DISABLE;
+  hfsmc.Init.WriteOperation      =   FSMC_WRITE_OPERATION_ENABLE;
 
   /* 填充FSMC读时序参数. */
   FSMC_NORSRAM_TimingTypeDef fsmc_readtiming;
@@ -147,7 +158,7 @@ uint8_t lcd_read_data( void )
   uint8_t data;
 
   __nop();
-  data = (uint8_t)LCD_DAT_ADDR;
+  data = LCD_DAT_ADDR;
 
   return data;
 }
@@ -172,6 +183,18 @@ void lcd_write_buffer( const uint16_t *buffer, uint32_t len )
   {
     LCD_DAT_ADDR = buffer[i];
   }
+}
+
+
+void lcd_enable_backlight( void )
+{
+  HAL_GPIO_WritePin(LCD_BL_PORT, LCD_BL_PIN, GPIO_PIN_SET);
+}
+
+
+void lcd_delay_ms( uint32_t ms )
+{
+  HAL_Delay(ms);
 }
 /* ************** 移植原语实现 ************** */
 

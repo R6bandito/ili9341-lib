@@ -30,6 +30,9 @@
   #define LCD_RD_PORT                      (GPIOD)
   #define LCD_RD_PIN                       (GPIO_PIN_4)
 
+  /* 背光控制引脚. */
+  #define LCD_BL_PORT                      (GPIOB)
+  #define LCD_BL_PIN                       (GPIO_PIN_0)
 
   /* 以下是基于STM32F103ZET6的FSMC数据总线接口引脚配置. */
   /* 请务必仔细核实每一位所对应引脚是否与所使用芯片相同. */
@@ -69,16 +72,16 @@
 
 
 /* ***************** FSMC_Param_Conf ***************** */
-  #define FSMC_READ_ADDR_SETUP_TIME        (0)
-  #define FSMC_READ_ADDR_HOLD_TIME         (0)
-  #define FSMC_READ_DATA_SETUP_TIME        (15)
+  #define FSMC_READ_ADDR_SETUP_TIME        (0x00)
+  #define FSMC_READ_ADDR_HOLD_TIME         (0x00)
+  #define FSMC_READ_DATA_SETUP_TIME        (0x0F)
 
-  #define FSMC_WRITE_ADDR_SETUP_TIME       (0)
-  #define FSMC_WRITE_ADDR_HOLD_TIME        (0)
-  #define FSMC_WRITE_DATA_SETUP_TIME       (1)
+  #define FSMC_WRITE_ADDR_SETUP_TIME       (0x00)
+  #define FSMC_WRITE_ADDR_HOLD_TIME        (0x00)
+  #define FSMC_WRITE_DATA_SETUP_TIME       (0x01)
 
   #define FSMC_ACCESS_MODE                 (FSMC_ACCESS_MODE_A)
-  #define FSMC_BUS_AROUND_DURATION         (0)
+  #define FSMC_BUS_AROUND_DURATION         (0x00)
   #define FSMC_NSBANK                      (FSMC_NORSRAM_BANK4)
 /* ***************** FSMC_Param_Conf ***************** */ 
 

@@ -32,6 +32,12 @@ __weak uint16_t lcd_read_data16( void )
 }
 
 
+__weak void lcd_enable_backlight( void )
+{
+  /* NULL */
+}
+
+
 __weak void lcd_driver_init( void )
 {
   /* NULL */
@@ -42,4 +48,10 @@ __weak void lcd_write_buffer( const uint16_t *buffer, uint32_t len )
 {
   (void)buffer;
   (void)len;
+}
+
+
+__weak void lcd_delay_ms( uint32_t ms )
+{
+  (void)ms;
 }
