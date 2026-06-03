@@ -30,6 +30,7 @@
 
   #define CUS_COLOR_WHITE                  (0xFFFFUL)
   #define CUS_COLOR_BLACK                  (0x0000UL)
+  #define CUS_COLOR_RED                    (0xF800UL)
 /* **************** Defines **************** */
 
 /* *********************** ILI9341_Device_Struct *********************** */
@@ -44,6 +45,9 @@ struct tftDevice
   void (*displayOn)( void );
   void (*setWindow)( tftDevice_HandleTypeDef *dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2 );      // 开窗回调.
   void (*lcd_fill)( tftDevice_HandleTypeDef *dev, uint16_t color );
+  void (*lcd_drawPixel)( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, uint16_t color );    // 画点函数(频繁开窗.性能低).
+  void (*lcd_drawHLine)( tftDevice_HandleTypeDef *dev, uint16_t pos_Y, uint16_t start_x, uint16_t len, uint16_t color );
+  void (*lcd_drawVLine)( tftDevice_HandleTypeDef *dev, uint16_t pos_X, uint16_t start_y, uint16_t len, uint16_t color );
 };
 /* *********************** ILI9341_Device_Struct *********************** */
 

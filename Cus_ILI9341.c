@@ -15,6 +15,9 @@ static inline int8_t cus_tft_init( tftDevice_HandleTypeDef *dev, uint8_t rotatio
 static void cus_tft_setWindow( tftDevice_HandleTypeDef *dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2 );    // 开窗.
 static void cus_tft_fill( tftDevice_HandleTypeDef *dev, uint16_t color );
 static inline void cus_tft_displayOn( void );
+static void cus_tft_drawPixel( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, uint16_t color );
+static void cus_tft_drawHLine( tftDevice_HandleTypeDef *dev, uint16_t pos_Y, uint16_t start_x, uint16_t len, uint16_t color );
+static void cus_tft_drawVLine( tftDevice_HandleTypeDef *dev, uint16_t pos_X, uint16_t start_y, uint16_t len, uint16_t color );
 /* *********************** CallBack *********************** */
 
 
@@ -37,7 +40,7 @@ typedef struct
   uint16_t xo, yo;                     // 当前逻辑原点相对于物理原点坐标.
   uint8_t rotation;                    // 显示方向控制. (0=默认显示, 1=顺时针90°,2=顺时针180°,3=顺时针270°)
 
-  /* 窗口状态. */
+  /* 窗口状态.(注意：窗口的 x0,y0 点与 x1,y1 点为逻辑坐标点. 而不是物理坐标点！) */
   uint16_t windows_x0, windows_y0;     // 当前窗口左上角坐标.
   uint16_t windows_x1, windows_y1;     // 当前窗口右下角坐标.
 
@@ -87,6 +90,9 @@ void Cus_ILI9341_InitHandle( tftDevice_HandleTypeDef *dev )
   dev->setWindow      = cus_tft_setWindow;
   dev->displayOn      = cus_tft_displayOn;
   dev->lcd_fill       = cus_tft_fill;
+  dev->lcd_drawPixel  = cus_tft_drawPixel;
+  dev->lcd_drawHLine  = cus_tft_drawHLine;
+  dev->lcd_drawVLine  = cus_tft_drawVLine;
 }
 
 
@@ -133,6 +139,46 @@ static inline int8_t cus_tft_init( tftDevice_HandleTypeDef *dev, uint8_t rotatio
 static void cus_tft_setWindow( tftDevice_HandleTypeDef *dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2 )
 {
   if ( !dev )   return;
+
+  uint16_t start_colmn, end_colmn;
+  uint16_t start_page, end_page;
+
+  if ( DevATTR(dev->Attr).rotation != ILI9341_ROTATION_0 )
+  {
+    /* 旋转情况. 需要坐标转换. */
+    coord_convert(dev, &x1, &y1);
+    coord_convert(dev, &x2, &y2);
+  }
+
+  start_colmn = (x1 < x2) ? x1 : x2;
+  end_colmn = (x1 < x2) ? x2 : x1;
+  start_page = (y1 < y2) ? y1 : y2;
+  end_page = (y1 < y2) ? y2 : y1;
+
+  /* 设置列起始地址. */
+  lcd_write_cmd(ILI9341_COL_ADDR_SET);
+  lcd_write_data(start_colmn >> 8);
+  lcd_write_data(start_colmn & 0xFF);
+
+  /* 设置列结束地址. */
+  lcd_write_data(end_colmn >> 8);
+  lcd_write_data(end_colmn & 0xFF);
+
+  /* 设置行起始地址. */
+  lcd_write_cmd(ILI9341_PAGES_ADDR_SET);
+  lcd_write_data(start_page >> 8);
+  lcd_write_data(start_page & 0xFF);
+
+  /* 设置行结束地址. */
+  lcd_write_data(end_page >> 8);
+  lcd_write_data(end_page & 0xFF);
+
+  /* 将窗口信息更新入设备结构. */
+  DevATTR(dev->Attr).windows_x0 = start_colmn;
+  DevATTR(dev->Attr).windows_y0 = start_page;
+  DevATTR(dev->Attr).windows_x1 = end_colmn;
+  DevATTR(dev->Attr).windows_y1 = end_page;
+
 }
 
 
@@ -157,6 +203,61 @@ static void cus_tft_fill( tftDevice_HandleTypeDef *dev, uint16_t color )
 }
 
 
+static void cus_tft_drawPixel( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, uint16_t color )
+{
+  if ( !dev )   return;
+
+  if ( x >= DevATTR(dev->Attr).width || y >= DevATTR(dev->Attr).height )  return;
+
+  /* 开 1x1 窗口. */
+  dev->setWindow(dev, x, y, x, y);
+
+  /* 写显存. */
+  lcd_write_cmd(ILI9341_MEM_WRITE);
+  lcd_write_data16(color);
+}
+
+
+static void cus_tft_drawHLine( tftDevice_HandleTypeDef *dev, uint16_t pos_Y, uint16_t start_x, uint16_t len, uint16_t color )
+{
+  if ( !dev )   return;
+
+  /* 边界检查. */
+  if ( pos_Y >= DevATTR(dev->Attr).height || (start_x + len) > DevATTR(dev->Attr).width )
+    return;
+
+  /* 开窗. */
+  dev->setWindow(dev, start_x, pos_Y, start_x + len - 1, pos_Y);
+
+  /* 批量写入. */
+  lcd_write_cmd(ILI9341_MEM_WRITE);
+  for( uint16_t idx = 0; idx < len; idx++ )
+  {
+    lcd_write_data16(color);
+  }
+}
+
+
+static void cus_tft_drawVLine( tftDevice_HandleTypeDef *dev, uint16_t pos_X, uint16_t start_y, uint16_t len, uint16_t color )
+{
+  if ( !dev )   return;
+
+  /* 边界检查. */
+  if ( pos_X >= DevATTR(dev->Attr).width || (start_y + len) >= DevATTR(dev->Attr).height )
+    return;
+
+  /* 开窗. */
+  dev->setWindow(dev, pos_X, start_y, pos_X, start_y + len - 1);
+
+  /* 批量写入. */
+  lcd_write_cmd(ILI9341_MEM_WRITE);
+  for( uint16_t idx = 0; idx < len; idx++ )
+  {
+    lcd_write_data16(color);
+  }
+}
+
+
 static inline void cus_tft_displayOn( void )
 {
   lcd_write_cmd(ILI9341_DISPLAY_ON);
@@ -169,34 +270,43 @@ static void coord_convert( tftDevice_HandleTypeDef *dev, uint16_t *x, uint16_t *
 {
   if ( !dev || !x || !y )   return;
 
+  uint16_t in_x = *x;
+  uint16_t in_y = *y;
+
   switch (DevATTR(dev->Attr).rotation)
   {
     case ILI9341_ROTATION_0:      // 旋转角度为0. 无需转换.
     {
-      *x = *x;
-      *y = *y;
+      *x = in_x;
+      *y = in_y;
 
       break;
     }   
 
     case ILI9341_ROTATION_90:     // 顺时针旋转90度.
     {
-      *x = DevATTR(dev->Attr).xo - *x;
-      *y = *y;
+      /* 将逻辑点映射到物理点. 例如逻辑点(2,1) 对应物理点(238,2). 计算公式如下 */
+      /* 注意：90度情况存在一个 逻辑xy轴与物理xy轴的换序！逻辑x对应物理y. 逻辑y对应物理x. */
+      *x = DevATTR(dev->Attr).xo - in_y;
+      *y = DevATTR(dev->Attr).yo + in_x;
       break;
     }
 
     case ILI9341_ROTATION_180:    // 顺时针旋转180度.
     {
-      *x = DevATTR(dev->Attr).xo - *x;
-      *y = DevATTR(dev->Attr).yo - *y;
+      /* 例如逻辑点(2,1) 对应物理点(237,318). 计算公式如下. */
+      /* 注意：180度情况不存在xy换序. */
+      *x = DevATTR(dev->Attr).xo - in_x;
+      *y = DevATTR(dev->Attr).yo - in_y;
       break;
     }
 
     case ILI9341_ROTATION_270:    // 顺时针旋转270度.
     {
-      *x = *x;
-      *y = DevATTR(dev->Attr).yo - *y;
+      /* 例如逻辑点(2,1) 对应物理点(1,317). 计算公式如下. */
+      /* 注意：270度情况也存在xy换序. */
+      *x = DevATTR(dev->Attr).xo + in_y;
+      *y = DevATTR(dev->Attr).yo - in_x;
       break;
     }
     
@@ -244,18 +354,59 @@ static inline int8_t cus_tft_setRotation( tftDevice_HandleTypeDef *dev, uint8_t 
 
   if ( !dev )    return -1;
 
-  DevATTR(dev->Attr).rotation = rotation;
-
-  if ( rotation == ILI9341_ROTATION_270 || rotation == ILI9341_ROTATION_90 )
+  switch (rotation)
   {
-    /* 对于顺时针90°与270°的情况. 需要宽高互换. */
-    DevATTR(dev->Attr).width = LCD_SCREEN_HEIGHT;
-    DevATTR(dev->Attr).height = LCD_SCREEN_WIDTH;
+    case ILI9341_ROTATION_0:  
+    {
+      /* 无旋转情况. 按照初始化数据运行.直接返回.*/
+      break;
+    }
 
-    /* 注意：此时 width 与 height 已经发送互换了. */
-    DevATTR(dev->Attr).windows_x1 = DevATTR(dev->Attr).width - 1;
-    DevATTR(dev->Attr).windows_y1 = DevATTR(dev->Attr).height - 1;;
+    case ILI9341_ROTATION_90: 
+    {
+      /* 顺时针旋转90度. */
+      /* 更新逻辑原点对应的物理坐标. (239,0) */
+      DevATTR(dev->Attr).xo = LCD_SCREEN_WIDTH - 1;
+      DevATTR(dev->Attr).yo = 0;
+
+      /* 宽高互换. */
+      DevATTR(dev->Attr).width = LCD_SCREEN_HEIGHT;
+      DevATTR(dev->Attr).height = LCD_SCREEN_WIDTH;
+      break;
+    }
+
+    case ILI9341_ROTATION_180: 
+    {
+      /* 顺时针旋转180度. */
+      /* 更新逻辑原点对应的物理坐标. (239,319) */
+      DevATTR(dev->Attr).xo = LCD_SCREEN_WIDTH - 1;
+      DevATTR(dev->Attr).yo = LCD_SCREEN_HEIGHT - 1;
+
+      /* 无需宽高互换. */
+      DevATTR(dev->Attr).width = LCD_SCREEN_WIDTH;
+      DevATTR(dev->Attr).height = LCD_SCREEN_HEIGHT;
+      break;
+    }
+
+    case ILI9341_ROTATION_270: 
+    {
+      /* 顺时针旋转270度. */
+      /* 更新逻辑原点物理坐标. (0,319) */
+      DevATTR(dev->Attr).xo = 0;
+      DevATTR(dev->Attr).yo = LCD_SCREEN_HEIGHT - 1; 
+
+      /* 宽高互换. */
+      DevATTR(dev->Attr).width = LCD_SCREEN_HEIGHT;
+      DevATTR(dev->Attr).height  =LCD_SCREEN_WIDTH;
+      break;
+    }
+    
+    default: return -1;
   }
+
+  DevATTR(dev->Attr).rotation = rotation;
+  DevATTR(dev->Attr).windows_x1 = DevATTR(dev->Attr).width - 1;
+  DevATTR(dev->Attr).windows_y1 = DevATTR(dev->Attr).height - 1;
 
   return 1;
 }
@@ -331,7 +482,7 @@ static inline void cus_tft_init_reg( void )
   {
     /* 设置内存读取扫描方向. */
     lcd_write_cmd(ILI9341_MEM_ACCESS_CTRL); 
-    lcd_write_data(0x48);
+    lcd_write_data(0x08);
   }
 
   {
