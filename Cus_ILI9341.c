@@ -16,8 +16,10 @@ static void cus_tft_setWindow( tftDevice_HandleTypeDef *dev, uint16_t x1, uint16
 static void cus_tft_fill( tftDevice_HandleTypeDef *dev, uint16_t color );
 static inline void cus_tft_displayOn( void );
 static void cus_tft_drawPixel( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, uint16_t color );
-static void cus_tft_drawHLine( tftDevice_HandleTypeDef *dev, uint16_t pos_Y, uint16_t start_x, uint16_t len, uint16_t color );
-static void cus_tft_drawVLine( tftDevice_HandleTypeDef *dev, uint16_t pos_X, uint16_t start_y, uint16_t len, uint16_t color );
+static void cus_tft_drawHLine( tftDevice_HandleTypeDef *dev, uint16_t pos_Y, uint16_t start_x, uint16_t len, uint8_t thickness, uint16_t color );
+static void cus_tft_drawVLine( tftDevice_HandleTypeDef *dev, uint16_t pos_X, uint16_t start_y, uint16_t len, uint8_t thickness, uint16_t color );
+static void cus_tft_drawRect( tftDevice_HandleTypeDef *dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t thickness, uint16_t color );
+static void cus_tft_drawChar( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, char chr, uint8_t font_size, uint16_t fg_color, uint16_t bg_color );
 /* *********************** CallBack *********************** */
 
 
@@ -59,6 +61,58 @@ static deviceAttr_t deviceAttrInstance;
 /* ********************************** */
 
 
+/* ********************************** */
+typedef struct 
+{
+  uint8_t width;             // 字宽.
+  uint8_t height;            // 字高.
+  uint8_t bytes_per_char;    // 每个字符占用的字节数.
+  const uint8_t *font_data;  // 二维字模一维化.
+
+} font_info_t;
+
+/* 默认字号12. */
+static const font_info_t font_12 = {
+  .width = ILI9341_FONT_12_WIDTH,
+  .height = ILI9341_FONT_12_HEIGHT,
+  .bytes_per_char = ILI9341_FONT_12_SIZE,
+  .font_data = (const uint8_t *)ili9341_font_12x6
+};
+
+#if (ILI9341_FONT_16)
+/* 字号16 */
+static const font_info_t font_16 = {
+  .width = ILI9341_FONT_16_WIDTH,
+  .height = ILI9341_FONT_16_HEIGHT,
+  .bytes_per_char = ILI9341_FONT_16_SIZE,
+  .font_data = (const uint8_t *)ili9341_font_16x8
+};
+#endif /* ILI9341_FONT_16 */
+
+#if (ILI9341_FONT_24)
+/* 字号24 */
+static const font_info_t font_24 = {
+  .width = ILI9341_FONT_24_WIDTH,
+  .height = ILI9341_FONT_24_HEIGHT,
+  .bytes_per_char = ILI9341_FONT_24_SIZE,
+  .font_data = (const uint8_t *)ili9341_font_24x12
+};
+#endif /* ILI9341_FONT_24 */
+
+#if (ILI9341_FONT_32)
+/* 字号32 */
+static const font_info_t font_32 = {
+  .width = ILI9341_FONT_32_WIDTH,
+  .height = ILI9341_FONT_32_HEIGHT,
+  .bytes_per_char = ILI9341_FONT_32_SIZE,
+  .font_data = (const uint8_t *)ili9341_font_32x16
+};
+#endif /* ILI9341_FONT_32 */
+
+static const font_info_t *cus_tft_getFont( uint8_t font_size );
+/* ********************************** */
+
+
 /* *********************** Public API *********************** */
 void Cus_ILI9341_InitHandle( tftDevice_HandleTypeDef *dev )
 {
@@ -93,6 +147,8 @@ void Cus_ILI9341_InitHandle( tftDevice_HandleTypeDef *dev )
   dev->lcd_drawPixel  = cus_tft_drawPixel;
   dev->lcd_drawHLine  = cus_tft_drawHLine;
   dev->lcd_drawVLine  = cus_tft_drawVLine;
+  dev->lcd_drawRect   = cus_tft_drawRect;
+  dev->lcd_drawChar   = cus_tft_drawChar;
 }
 
 
@@ -124,7 +180,7 @@ static inline int8_t cus_tft_init( tftDevice_HandleTypeDef *dev, uint8_t rotatio
   if ( res < 0 )    return -1;
 
   /* 清屏. */
-  dev->lcd_fill(dev, CUS_COLOR_WHITE);
+  dev->lcd_fill(dev, CUS_THEME_DEFAULT_BG);
 
   /* 开显示. */
   dev->displayOn();
@@ -218,42 +274,124 @@ static void cus_tft_drawPixel( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_
 }
 
 
-static void cus_tft_drawHLine( tftDevice_HandleTypeDef *dev, uint16_t pos_Y, uint16_t start_x, uint16_t len, uint16_t color )
+static void cus_tft_drawHLine( tftDevice_HandleTypeDef *dev, uint16_t pos_Y, uint16_t start_x, uint16_t len, uint8_t thickness, uint16_t color )
 {
-  if ( !dev )   return;
+  if ( !dev || thickness == 0 )   return;
 
   /* 边界检查. */
-  if ( pos_Y >= DevATTR(dev->Attr).height || (start_x + len) > DevATTR(dev->Attr).width )
+  if ( pos_Y + thickness > DevATTR(dev->Attr).height || (start_x + len) > DevATTR(dev->Attr).width )
     return;
 
   /* 开窗. */
-  dev->setWindow(dev, start_x, pos_Y, start_x + len - 1, pos_Y);
+  dev->setWindow(dev, start_x, pos_Y, (start_x + len - 1), (pos_Y + thickness - 1));
 
   /* 批量写入. */
   lcd_write_cmd(ILI9341_MEM_WRITE);
-  for( uint16_t idx = 0; idx < len; idx++ )
+  for( uint16_t idx = 0; idx < len * thickness; idx++ )
   {
     lcd_write_data16(color);
   }
 }
 
 
-static void cus_tft_drawVLine( tftDevice_HandleTypeDef *dev, uint16_t pos_X, uint16_t start_y, uint16_t len, uint16_t color )
+static void cus_tft_drawVLine( tftDevice_HandleTypeDef *dev, uint16_t pos_X, uint16_t start_y, uint16_t len, uint8_t thickness, uint16_t color )
 {
-  if ( !dev )   return;
+  if ( !dev || thickness == 0 )   return;
 
   /* 边界检查. */
-  if ( pos_X >= DevATTR(dev->Attr).width || (start_y + len) >= DevATTR(dev->Attr).height )
+  if ( pos_X + thickness > DevATTR(dev->Attr).width || (start_y + len) >= DevATTR(dev->Attr).height )
     return;
 
   /* 开窗. */
-  dev->setWindow(dev, pos_X, start_y, pos_X, start_y + len - 1);
+  dev->setWindow(dev, pos_X, start_y, (pos_X + thickness - 1), (start_y + len - 1));
 
   /* 批量写入. */
   lcd_write_cmd(ILI9341_MEM_WRITE);
-  for( uint16_t idx = 0; idx < len; idx++ )
+  for( uint16_t idx = 0; idx < len * thickness; idx++ )
   {
     lcd_write_data16(color);
+  }
+}
+
+
+static void cus_tft_drawRect( tftDevice_HandleTypeDef *dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t thickness, uint16_t color )
+{
+  if ( !dev )   return;
+
+  /* 检查两个点是否均在屏幕内. */
+  if ( x1 >= DevATTR(dev->Attr).width || y1 >= DevATTR(dev->Attr).height )  return;
+  if ( x2 >= DevATTR(dev->Attr).width || y2 >= DevATTR(dev->Attr).height )  return;
+
+  /* 将两点重新进行映射. 防止后续减出负数. */
+  uint16_t in_x1, in_y1, in_x2, in_y2;
+  in_x1 = (x1 > x2) ? x2 : x1;
+  in_x2 = (x2 > x1) ? x2 : x1;
+  in_y1 = (y1 > y2) ? y2 : y1;
+  in_y2 = (y2 > y1) ? y2 : y1;
+
+  if ( in_x1 == in_x2 && in_y1 == in_y2 )
+  {
+    /* 起始点与结束点重合？不存在矩形. 退化为画点. */
+    dev->lcd_drawPixel(dev, in_x1, in_y1, color);
+    return;
+  }
+
+  if ( in_x1 == in_x2 && in_y1 != in_y2 )
+  {
+    /* 退化为画竖直线. */
+    dev->lcd_drawVLine(dev, in_x1, in_y1, (in_y2 - in_y1 + 1), thickness, color);
+    return;
+  }
+
+  if ( in_x1 != in_x2 && in_y1 == in_y2 )
+  {
+    /* 退化为画水平线. */
+    dev->lcd_drawHLine(dev, in_y1, in_x1, (in_x2 - in_x1 + 1), thickness, color);
+    return;
+  }
+
+  /* 根据厚度画矩形. */
+  dev->lcd_drawHLine(dev, in_y1, in_x1, (in_x2 - in_x1 + 1), thickness, color);
+  dev->lcd_drawVLine(dev, in_x1, in_y1, (in_y2 - in_y1 + 1), thickness, color);
+  dev->lcd_drawHLine(dev, (in_y2 - thickness + 1), in_x1, (in_x2 - in_x1 + 1), thickness, color);
+  dev->lcd_drawVLine(dev, (in_x2 - thickness + 1), in_y1, (in_y2 - in_y1 + 1), thickness, color);
+}
+
+
+static void cus_tft_drawChar( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, char chr, uint8_t font_size, uint16_t fg_color, uint16_t bg_color )
+{
+  if ( !dev )  return;
+
+  const font_info_t *font = cus_tft_getFont(font_size);
+
+  /* 边界检查. */
+  if ( x + font->width > DevATTR(dev->Attr).width || y + font->height > DevATTR(dev->Attr).height )    return;
+
+  /* 先处理背景色. */
+  /* 注： 字符是以传入坐标点作为左上基准点的. */
+  dev->setWindow(dev, x, y, (x + font->width - 1), (y + font->height - 1));
+  dev->lcd_fill(dev, bg_color);
+
+  /* 从一维化的字模数组中定位到指定字符的第一个字节. */
+  const uint8_t *char_pixel = font->font_data + ((chr - ' ') * font->bytes_per_char);
+
+  /* 扫描字模. */
+  for( uint8_t col = 0; col < font->width; col++ )
+  {
+    /* 字体每列最大字节数. */
+    uint8_t bytes_per_col = (font->height + 7) / 8;
+
+    for( uint8_t row = 0; row < font->height; row++ )
+    {
+      uint8_t byte_idx = row / 8;
+      uint8_t bit_idx = row % 8;
+      uint8_t byte = char_pixel[col * bytes_per_col + byte_idx];
+      uint8_t bit = (byte >> (7 - bit_idx)) & 0x01;
+      if ( bit )
+      {
+        dev->lcd_drawPixel(dev, (x + col), (y + row), fg_color);
+      }
+    }
   }
 }
 
@@ -409,6 +547,49 @@ static inline int8_t cus_tft_setRotation( tftDevice_HandleTypeDef *dev, uint8_t 
   DevATTR(dev->Attr).windows_y1 = DevATTR(dev->Attr).height - 1;
 
   return 1;
+}
+
+
+static const font_info_t *cus_tft_getFont( uint8_t font_size )
+{
+  switch (font_size)
+  {
+    case CUS_FONT_SIZE_12: 
+    {
+      #if(ILI9341_FONT_12)
+        return &font_12;
+      #endif 
+    }
+
+    case CUS_FONT_SIZE_16: 
+    {
+      #if(ILI9341_FONT_16)
+        return &font_16;
+      #else
+        return &font_12;
+      #endif 
+    } 
+
+    case CUS_FONT_SIZE_24: 
+    {
+      #if(ILI9341_FONT_24)
+        return &font_24;
+      #else 
+        return &font_12;
+      #endif 
+    } 
+
+    case CUS_FONT_SIZE_32: 
+    {
+      #if(ILI9341_FONT_32)
+        return &font_32;
+      #else 
+        return &font_12;
+      #endif 
+    }
+    
+    default:  return &font_12;  
+  }
 }
 
 
