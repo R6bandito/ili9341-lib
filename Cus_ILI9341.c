@@ -18,8 +18,10 @@ static inline void cus_tft_displayOn( void );
 static void cus_tft_drawPixel( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, uint16_t color );
 static void cus_tft_drawHLine( tftDevice_HandleTypeDef *dev, uint16_t pos_Y, uint16_t start_x, uint16_t len, uint8_t thickness, uint16_t color );
 static void cus_tft_drawVLine( tftDevice_HandleTypeDef *dev, uint16_t pos_X, uint16_t start_y, uint16_t len, uint8_t thickness, uint16_t color );
+static void cus_tft_drawLine( tftDevice_HandleTypeDef *dev, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t thickness, uint16_t color );
 static void cus_tft_drawRect( tftDevice_HandleTypeDef *dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t thickness, uint16_t color );
 static void cus_tft_drawChar( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, char chr, uint8_t font_size, uint16_t fg_color, uint16_t bg_color );
+static void cus_tft_drawString( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, const char *str, uint8_t font_size, uint16_t fg_color, uint16_t bg_color );
 /* *********************** CallBack *********************** */
 
 
@@ -58,6 +60,8 @@ typedef struct
 static deviceAttr_t deviceAttrInstance;
 
 #define DevATTR(attr)   (*((deviceAttr_t *)(attr)))
+#define ABS(x)          ((x) < 0 ? -(x) : (x))                // 求取绝对值.(不应传入 x++ 此类表达式)
+#define SIGN(x)         ((x) > 0 ? 1 : ((x) < 0 ? -1 : 0))    // 符号解析.
 /* ********************************** */
 
 
@@ -149,6 +153,8 @@ void Cus_ILI9341_InitHandle( tftDevice_HandleTypeDef *dev )
   dev->lcd_drawVLine  = cus_tft_drawVLine;
   dev->lcd_drawRect   = cus_tft_drawRect;
   dev->lcd_drawChar   = cus_tft_drawChar;
+  dev->lcd_drawLine   = cus_tft_drawLine;
+  dev->lcd_drawString = cus_tft_drawString;
 }
 
 
@@ -263,8 +269,6 @@ static void cus_tft_drawPixel( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_
 {
   if ( !dev )   return;
 
-  if ( x >= DevATTR(dev->Attr).width || y >= DevATTR(dev->Attr).height )  return;
-
   /* 开 1x1 窗口. */
   dev->setWindow(dev, x, y, x, y);
 
@@ -277,10 +281,6 @@ static void cus_tft_drawPixel( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_
 static void cus_tft_drawHLine( tftDevice_HandleTypeDef *dev, uint16_t pos_Y, uint16_t start_x, uint16_t len, uint8_t thickness, uint16_t color )
 {
   if ( !dev || thickness == 0 )   return;
-
-  /* 边界检查. */
-  if ( pos_Y + thickness > DevATTR(dev->Attr).height || (start_x + len) > DevATTR(dev->Attr).width )
-    return;
 
   /* 开窗. */
   dev->setWindow(dev, start_x, pos_Y, (start_x + len - 1), (pos_Y + thickness - 1));
@@ -298,10 +298,6 @@ static void cus_tft_drawVLine( tftDevice_HandleTypeDef *dev, uint16_t pos_X, uin
 {
   if ( !dev || thickness == 0 )   return;
 
-  /* 边界检查. */
-  if ( pos_X + thickness > DevATTR(dev->Attr).width || (start_y + len) >= DevATTR(dev->Attr).height )
-    return;
-
   /* 开窗. */
   dev->setWindow(dev, pos_X, start_y, (pos_X + thickness - 1), (start_y + len - 1));
 
@@ -317,10 +313,6 @@ static void cus_tft_drawVLine( tftDevice_HandleTypeDef *dev, uint16_t pos_X, uin
 static void cus_tft_drawRect( tftDevice_HandleTypeDef *dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t thickness, uint16_t color )
 {
   if ( !dev )   return;
-
-  /* 检查两个点是否均在屏幕内. */
-  if ( x1 >= DevATTR(dev->Attr).width || y1 >= DevATTR(dev->Attr).height )  return;
-  if ( x2 >= DevATTR(dev->Attr).width || y2 >= DevATTR(dev->Attr).height )  return;
 
   /* 将两点重新进行映射. 防止后续减出负数. */
   uint16_t in_x1, in_y1, in_x2, in_y2;
@@ -364,9 +356,6 @@ static void cus_tft_drawChar( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t
 
   const font_info_t *font = cus_tft_getFont(font_size);
 
-  /* 边界检查. */
-  if ( x + font->width > DevATTR(dev->Attr).width || y + font->height > DevATTR(dev->Attr).height )    return;
-
   /* 先处理背景色. */
   /* 注： 字符是以传入坐标点作为左上基准点的. */
   dev->setWindow(dev, x, y, (x + font->width - 1), (y + font->height - 1));
@@ -392,6 +381,124 @@ static void cus_tft_drawChar( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t
         dev->lcd_drawPixel(dev, (x + col), (y + row), fg_color);
       }
     }
+  }
+}
+
+
+static void cus_tft_drawLine( tftDevice_HandleTypeDef *dev, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t thickness, uint16_t color )
+{
+  /* 不允许传入负数. 之所以采用int类型只是为了后续计算考虑. */
+  if ( x1 < 0 || x2 < 0 || y1 < 0 || y2 < 0 )   return;
+
+  /* 计算变化量. */
+  int16_t dx = ABS(x2 - x1);
+  int16_t dy = ABS(y2 - y1);
+
+  /* 检查是否为水平线或垂线. 若是则调用对应方法而不进入 Bresenham 循环. */
+  if ( dx == 0 )  
+  { 
+    uint16_t start = (y1 < y2) ? y1 : y2;
+    dev->lcd_drawVLine(dev, x1, start, (dy + 1), thickness, color); 
+    return; 
+  }
+  if ( dy == 0 )  
+  { 
+    uint16_t start = (x1 < x2) ? x1 : x2;
+    dev->lcd_drawHLine(dev, y1, start, (dx + 1), thickness, color); 
+    return; 
+  }
+
+  /* 计算直线步进方向. */
+  int8_t sx = SIGN(x2 - x1);
+  int8_t sy = SIGN(y2 - y1);
+
+  /* 根据直线大致走向决定加粗方向. */
+  bool thick_oritation;
+  if ( dx >= dy )  
+    thick_oritation = true;     // 较平缓直线. 垂直加粗.
+  else 
+    thick_oritation = false;    // 较陡峭直线. 水平加粗.
+
+  /* 初始化累积参数. */
+  int16_t Pi = dx - dy;
+
+  /* 循环画点. */
+  int16_t xi = x1;
+  int16_t yi = y1;
+  int8_t half = thickness / 2;
+  while( (xi != x2 + 1) && (yi != y2 + 1) )
+  {
+    if( thick_oritation )
+    {
+      /* 平缓直线 垂直加粗. 画垂线. */
+      dev->lcd_drawVLine(dev, xi, yi - half, thickness + 1, 1, color);
+    }
+    else 
+    {
+      /* 陡峭直线. 水平加粗. */
+      dev->lcd_drawHLine(dev, yi, xi - half, thickness + 1, 1, color);
+    }
+
+    int16_t err = 2 * Pi;
+
+    if ( err < dx )
+    {
+      /* y方向需要步进. */
+      Pi += dx;
+      yi += sy;
+    }
+
+    if ( err > -dy )
+    {
+      /* x方向需要步进. */
+      Pi -= dy;
+      xi += sx; 
+    }
+
+    /* 循环画点直到结束. */
+  }
+}
+
+
+static void cus_tft_drawString( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, const char *str, uint8_t font_size, uint16_t fg_color, uint16_t bg_color )
+{
+  if ( !dev )   return;
+
+  /* 拿到font参数. */
+  const font_info_t *font = cus_tft_getFont(font_size);
+
+  uint16_t cur_x = x;
+  uint16_t cur_y = y;
+  /* 逐字符绘制. */
+  while( *str )
+  {
+    if ( *str == '\n' )
+    {
+      /* 换行. */
+      cur_x = x;
+      cur_y += font->height;
+      str++;
+      continue;
+    }
+
+    if ( *str == '\r' )
+    {
+      /* 回车. */
+      cur_x = x;
+      str++;
+      continue;
+    }
+
+    if ( cur_x + font->width > DevATTR(dev->Attr).width )
+    {
+      /* 自动换行. */
+      cur_x = x;
+      cur_y += font->height;
+    }
+
+    dev->lcd_drawChar(dev, cur_x, cur_y, *str, font_size, fg_color, bg_color);
+    cur_x += font->width;
+    str++;
   }
 }
 
