@@ -20,8 +20,10 @@ static void cus_tft_drawHLine( tftDevice_HandleTypeDef *dev, uint16_t pos_Y, uin
 static void cus_tft_drawVLine( tftDevice_HandleTypeDef *dev, uint16_t pos_X, uint16_t start_y, uint16_t len, uint8_t thickness, uint16_t color );
 static void cus_tft_drawLine( tftDevice_HandleTypeDef *dev, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t thickness, uint16_t color );
 static void cus_tft_drawRect( tftDevice_HandleTypeDef *dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t thickness, uint16_t color );
+static void cus_tft_drawFillCircle( tftDevice_HandleTypeDef *dev, int16_t x, int16_t y, int16_t r, uint16_t color );
 static void cus_tft_drawChar( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, char chr, uint8_t font_size, uint16_t fg_color, uint16_t bg_color );
 static void cus_tft_drawString( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, const char *str, uint8_t font_size, uint16_t fg_color, uint16_t bg_color );
+static void cus_tft_drawCircle( tftDevice_HandleTypeDef *dev, int16_t x, int16_t y, int16_t r, uint8_t thickness, uint16_t color, uint16_t bg_color );
 /* *********************** CallBack *********************** */
 
 
@@ -155,6 +157,8 @@ void Cus_ILI9341_InitHandle( tftDevice_HandleTypeDef *dev )
   dev->lcd_drawChar   = cus_tft_drawChar;
   dev->lcd_drawLine   = cus_tft_drawLine;
   dev->lcd_drawString = cus_tft_drawString;
+  dev->lcd_drawFillCircle = cus_tft_drawFillCircle;
+  dev->lcd_drawCircle = cus_tft_drawCircle;
 }
 
 
@@ -500,6 +504,52 @@ static void cus_tft_drawString( tftDevice_HandleTypeDef *dev, uint16_t x, uint16
     cur_x += font->width;
     str++;
   }
+}
+
+
+static void cus_tft_drawFillCircle( tftDevice_HandleTypeDef *dev, int16_t x, int16_t y, int16_t r, uint16_t color )
+{
+  if ( !dev || r <= 0 )   return;
+
+  /* 圆上(0,r)点. */
+  int16_t cx = 0;
+  int16_t cy = r;
+
+  /* 初始决策参数. */
+  int16_t Pi = 3 - 2 * r;
+
+  while ( cx <= cy )
+  {
+    /* 每一个主点. 分别作水平线（填充） */
+    dev->lcd_drawHLine(dev, y - cy, x - cx, 2 * cx + 1, 1, color);
+    dev->lcd_drawHLine(dev, y + cy, x - cx, 2 * cx + 1, 1, color);
+    dev->lcd_drawHLine(dev, y - cx, x - cy, 2 * cy + 1, 1, color);
+    dev->lcd_drawHLine(dev, y + cx, x - cy, 2 * cy + 1, 1, color);
+
+    cx++;
+    if ( Pi < 0 )
+    {
+      /* y不动. */
+      Pi += 4 * cx + 6;
+    }
+    else 
+    {
+      cy--;
+      Pi += 4 * (cx -cy) + 10;
+    }
+  }
+}
+
+
+static void cus_tft_drawCircle( tftDevice_HandleTypeDef *dev, int16_t x, int16_t y, int16_t r, uint8_t thickness, uint16_t color, uint16_t bg_color )
+{
+  if ( !dev || r <= 0 )   return;
+
+  /* 先画一个实心圆. */
+  dev->lcd_drawFillCircle(dev, x, y, r, color);
+
+  /* 再画一个背景色实心圆. */
+  dev->lcd_drawFillCircle(dev, x, y, r - thickness, bg_color);
 }
 
 

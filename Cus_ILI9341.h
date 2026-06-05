@@ -63,8 +63,10 @@ struct tftDevice
   void (*lcd_drawPixel)( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, uint16_t color );    // 画点函数(频繁开窗.性能低).
   void (*lcd_drawHLine)( tftDevice_HandleTypeDef *dev, uint16_t pos_Y, uint16_t start_x, uint16_t len, uint8_t thickness, uint16_t color );         // 画水平线.
   void (*lcd_drawVLine)( tftDevice_HandleTypeDef *dev, uint16_t pos_X, uint16_t start_y, uint16_t len, uint8_t thickness, uint16_t color );         // 画垂线.
-  void (*lcd_drawLine)( tftDevice_HandleTypeDef *dev, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t thickness, uint16_t color );      // 画任意斜率斜线.
+  void (*lcd_drawLine)( tftDevice_HandleTypeDef *dev, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t thickness, uint16_t color );          // 画任意斜率斜线.
   void (*lcd_drawRect)( tftDevice_HandleTypeDef *dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t thickness, uint16_t color );      // 画矩形边框(无填充).
+  void (*lcd_drawFillCircle)( tftDevice_HandleTypeDef *dev, int16_t x, int16_t y, int16_t r, uint16_t color );                                      // 画实心圆.
+  void (*lcd_drawCircle)( tftDevice_HandleTypeDef *dev, int16_t x, int16_t y, int16_t r, uint8_t thickness, uint16_t color, uint16_t bg_color );    // 画圆框.
   void (*lcd_drawChar)( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, char chr, uint8_t font_size, uint16_t fg_color, uint16_t bg_color );  // 字符显示.
   void (*lcd_drawString)( tftDevice_HandleTypeDef *dev, uint16_t x, uint16_t y, const char *str, uint8_t font_size, uint16_t fg_color, uint16_t bg_color );   // 字符串显示.
 };
